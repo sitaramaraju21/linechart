@@ -1,0 +1,567 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Multi series line chart in d3.js
+</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">		
+    <link rel="stylesheet" href="css/styles.css">
+   <!-- <script src="js/d3.js""></script>-->
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="js/ChartsData.js""></script>
+
+    <script>
+
+        // Set default width and height, calculate ratio
+        var default_width = 1350;
+        var default_height = 500;
+        var default_ratio = default_width / default_height;
+
+        // Determine current size, which determines vars
+        function set_vars() {
+            //alert('setting vars')
+           var current_width = window.innerWidth - 10;
+           var current_height = window.innerHeight - 90;
+
+            current_ratio = current_width / current_height;
+
+            default_width = current_width;
+            default_height = current_height;
+            default_ratio = default_width / default_height;
+        };
+
+        set_vars();
+
+         var chartConfig = {
+             width: default_width,
+             height: default_height,
+             bottomAxisLabelColor: "#B2B3B5",//"#1F497D",
+             bottomAxisLabelFontSize: "13px",
+             verticalAxisLabelColor: "#B2B3B5",//"#1F497D",
+             verticalAxisLabelFontSize: "13px",
+             verticalLabelColor: "#BF8B52",
+             verticalLabelFontSize: "13px",
+             series_width: 3,
+             legendLabelColor: "#1F497D",
+             legendLabelFontSize: "12px",
+             pointValueFontSize: "10px",
+             pointValueFontColor:"black"
+         };
+
+        
+
+         function drawChartForData(data, chartDivId, chartConfig) { 
+             var div = d3.select("body").append("div")
+                    .attr("class", "tooltip")
+                    .style("opacity", 0);   
+
+             // reset old contents
+             document.getElementById(chartDivId).innerHTML = "";
+
+             var chartDivSizeWidth = chartConfig.width;
+             var chartDivSizeHeight = chartConfig.height;
+             var legendSectionHeight = 36;
+             var verticalLabelWidth = 36;
+
+             var seriesColorScale = d3.scale.category10();
+
+             if (default_width < 700) {
+                 // make it two lines
+                 legendSectionHeight = legendSectionHeight + 28;
+             }
+
+             var chartDiv = chartDivId;
+             var margin = { top: 10, right: 30, bottom: 60, left: 30 },
+                width = chartDivSizeWidth - margin.left - margin.right - verticalLabelWidth,
+                height = chartDivSizeHeight - margin.top - margin.bottom - legendSectionHeight;
+
+             // generate svg
+             var svg = d3.select("#" + chartDivId)
+                 .append("svg")
+                 .attr("width", chartDivSizeWidth)
+                .attr("height", chartDivSizeHeight)
+                .append("g")
+                 .attr("transform", "translate(" + (margin.left + verticalLabelWidth) + "," + (margin.top + legendSectionHeight) + ")");
+
+             var v_ruler = svg.append('g')
+                  .attr('class', 'v_ruler')
+                  .append("path")
+                  .attr("class", "r_dotted")
+                  .attr("d", "M 0 0 L 0 " + height)
+             ;// .style("stroke-dasharray", ("2,2"));
+
+             var convertedFinalData = chartData;//convertHierarchicalDataIntoFlatData(data);
+
+             // generate scales
+             var xScale = d3.scale.ordinal().rangeBands([0, width], 0, 0);
+             var yScale = d3.scale.linear().range([height, 0]);
+             //var colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+             var maximumValue = -1;
+             for (var i = 0; i < chartData.length; i++) {
+                 var tempMax = d3.max(chartData[i], function (d) {
+                     return +d.value;
+                 });
+                 if (tempMax > maximumValue) {
+                     maximumValue = tempMax;
+                 }
+             }
+                             
+             // update scales domains
+             yScale.domain([0, 80]); //maximumConsumption]);
+             xScale.domain(convertedFinalData[0].data.map(function (d) {
+                 return d.date;
+             }));
+
+             // Define the axes
+             var xAxis = d3.svg.axis().scale(xScale)
+                 .orient("bottom").ticks(5);
+
+             var yAxis = d3.svg.axis().scale(yScale)
+                 .orient("left").ticks(10).innerTickSize(-width)
+            .outerTickSize(6)
+            .tickPadding(10); // remove left edges
+             
+             // define the Beef & Veal Line
+             var svg_Line = d3.svg.line()
+                 .x(function (d) {
+                     return xScale(d.date) + xScale.rangeBand() / 2; // as scale always return lower limit. 
+                 })
+                 .y(function (d) {
+                     return yScale(d.value);
+                 });
+
+             // Add the X Axis
+             svg.append("g")
+                 .attr("class", "x axis xaxis")
+                 .attr("transform", "translate(0," + height + ")")
+                 .call(xAxis)
+                .selectAll("text")
+                .attr("y", 16) // 10
+                //.attr("x", -8)  // -10
+                .attr("dy", ".35em")
+                //.attr("transform", "rotate(-45)") // -22
+                .style("text-anchor", "center");
+
+             var verticalLabelText = "";//"Temp Vertical Label";
+
+             // Add the Y Axis
+             svg.append("g")
+                 .attr("class", "y axis yaxis")
+                 .call(yAxis) // add vertical label as well 
+              .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -40)
+                .attr("x", function (d) {
+                    if(height >= 460){
+                        return -100;
+                    }
+                    else{
+                        var tempScale = d3.scale.linear().range([0, -100]).domain([220,460]);
+                        return tempScale(height);
+                    }
+                })
+                .attr("class", "green verticalLabel") 
+                .style("text-anchor", "end")
+                 .style("fill", chartConfig.verticalLabelColor)
+                 .style("font-size", chartConfig.verticalLabelFontSize)
+                 .style("text-anchor", "end")
+                .text(verticalLabelText.toUpperCase());
+            
+             for (var i = 0; i < convertedFinalData.length; i++) {
+                 svg.append("path")
+                     .attr("class", "line cls_beef_veal_series")
+                     .style("stroke-width", chartConfig.series_width)
+                     .style("stroke", seriesColorScale(convertedFinalData[i].city))
+                     .attr("d", svg_Line(convertedFinalData[i].data));
+
+                 // generate lines labels
+                 svg.append("text")
+                     .attr("x", (xScale(convertedFinalData[i].data[convertedFinalData[i].data.length - 1].date)) + xScale.rangeBand() / 2 + 22)
+                     .attr("y", (yScale(convertedFinalData[i].data[convertedFinalData[i].data.length - 1].value))+3)
+                    .text(convertedFinalData[i].city)
+                     .style("fill", chartConfig.legendLabelColor)
+                    .style("font-weight", "bold")
+                     .style("font-size", chartConfig.legendLabelFontSize)
+                    .style("font-family", "arial");
+             }
+
+             generateDottedLines(); // highlighted on hover
+             generatePointsAndLabelsOnSeries(svg, chartConfig, convertedFinalData, xScale, yScale, div, seriesColorScale);
+
+             var rect_width = width;
+             var rect_height = height;
+
+             var currentViewedAxisTick = 0;
+
+             svg.append("rect")
+            .attr("transform", "translate(" + 0 + "," +0 + ")")
+            .attr("class", "overlay")
+            .attr("width", rect_width)
+            .attr("height", rect_height)
+            .on("mouseover", function () {
+               // focus.style("display", null);
+            })
+            .on("mouseout", function () {
+               // focus.style("display", "none");
+            })
+            .style("fill","transparent")
+            .on("mousemove", function (d) {
+                var perTickWidth = width / convertedFinalData[0].data.length;
+                var currentPosition = d3.mouse(this)[0];
+                var selectedIndex = -1;
+
+                for (var k = 0; k < convertedFinalData[0].data.length; k++) {
+                    var start = k * perTickWidth;
+                    var end = (k + 1) * perTickWidth;
+
+                    if (currentPosition >= start && currentPosition < end) {
+                        selectedIndex = k;
+                        d3.selectAll(".cls_" + selectedIndex).style("opacity", 1);
+                    }
+                    else {
+                        d3.selectAll(".cls_" + k).style("opacity", 0);
+                    }
+                }
+
+                d3.select('.v_ruler')
+                .style("display", "block")
+                .attr("transform", "translate(" + (xScale(convertedFinalData[0].data[selectedIndex].date) + xScale.rangeBand() / 2) + ",0)");
+            });
+         }
+
+         function generateDottedLines(){
+             
+         }
+
+         function generatePointsAndLabelsOnSeries(svg, chartConfig, convertedFinalData, xScale, yScale, div, seriesColorScale) {
+             for (var i = 0; i < convertedFinalData.length; i++) {
+                 // generate points against each line. First created on beaf_veal
+                 svg.selectAll(".dots_beaf_veal"+i)
+                     .data(convertedFinalData[i].data)
+                 .enter()
+                    .append("circle")
+                 .attr("class", function (d, j) {
+                     return "cls_" + j;
+                 })
+                    .attr("cx", function (d) {
+                        return (xScale(d.date)) + xScale.rangeBand() / 2;
+                    })
+                    .attr("cy", function (d) {
+                        return yScale(d.value);
+                    })
+                    .style("fill", "white")
+                     .style("stroke", seriesColorScale(convertedFinalData[i].city))
+                     .style("stroke-width", 2)
+                    .attr("r", 6)
+                     .style("opacity",0)
+                     .on("mouseover", function (d,j) {
+                         var date = d.date;
+                         d3.selectAll(".cls_" + j).style("opacity",1);
+                         //c_addClass(d3.select('.x_tick.date_' + date.replace("-", "_")), "active");
+
+                         d3.select('.v_ruler')
+                              .style("display", "block")
+                              .attr("transform", "translate(" + d3.select(this).attr('cx') + ",0)")
+                     })
+                  .on("mouseout", function (d,j) {
+                      var date = d.date;
+
+                     // c_removeClass(d3.select('.x_tick.date_' + date.replace("-", "_")), "active");
+                      d3.selectAll(".cls_" + j).style("opacity", 0);
+                      // Hide
+                      d3.select('.v_ruler')
+                         .style("display", "none");
+
+                      // Hide
+                      div.transition()
+                          .duration(200)
+                          .style("opacity", 0);
+                      div.style("display", "none");
+                  });
+
+                 // generate points labels
+                 svg.selectAll(".dots_label"+i)
+                    .data(convertedFinalData[i].data)
+                .enter()
+                 .append("text")
+                .attr("class", function (d, j) {
+                    return "cls_" + j;
+                })                 
+                .attr("x", function (d) {
+                    return (xScale(d.date)) + xScale.rangeBand() / 2 + 8;
+                })
+                .attr("y", function (d) {
+                    return yScale(d.value) + 3;
+                })
+                .text(function (d) {
+                    return d.value;
+                })
+                     .style("opacity", 0)
+                    .style("fill", chartConfig.pointValueFontColor)
+                .style("font-weight", "normal")
+                    .style("font-size", chartConfig.pointValueFontSize)
+                .style("font-family", "arial");
+             }
+         }
+
+         function applyFontPropertiesOnAxisLabels(svg,chartConfig) {
+             svg.selectAll(".xaxis").selectAll("text")
+                 .style("font-size", chartConfig.bottomAxisLabelFontSize)
+                 .style("font-weight", "bold")
+                 .style("font-family", "Calibri")
+             .style("fill", chartConfig.bottomAxisLabelColor);
+
+             svg.selectAll(".yaxis").selectAll("text")
+                .style("font-size", chartConfig.verticalAxisLabelFontSize)
+                .style("font-weight", "bold")
+                 .style("font-family", "Calibri")
+            .style("fill", chartConfig.verticalAxisLabelColor);
+
+             svg.selectAll(".yaxis").select(".verticalLabel")
+             .style("fill", chartConfig.verticalLabelColor)
+                 .style("font-size", chartConfig.verticalLabelFontSize)
+         }
+        
+         function generateLegends(svg,data,chartConfig,drawingWidth) {
+             var legendLabelsPlusLinesWidth = 580;
+             var startPositionXForCenterLegend = 0;
+             startPositionXForCenterLegend = drawingWidth / 2 - legendLabelsPlusLinesWidth / 2;
+             // Add legend 
+             // legendLabelColor
+             var checkedBoxWidthHeight = 20;
+
+             svg.append("rect").attr("x", (startPositionXForCenterLegend + 0)).attr("y", (-28))
+                 .attr("width", checkedBoxWidthHeight)
+                 .attr("height", checkedBoxWidthHeight)
+                 .style("stroke", chartConfig.series_beef_veal_color)
+                 .style("stroke-width", "2px")
+             .style("fill", "transparent")
+             .on("click", function (d) {
+                 if (beafSeriesShowHide) {
+                     // hide it
+                     beafSeriesShowHide = false;
+
+                     svg.select(".cls_beef_veal_series").style("display","none");
+                     svg.selectAll(".cls_beef_veel_points").style("display", "none");
+
+                     svg.selectAll(".crossLine_beef_leaf").style("display", "block");
+                 }
+                 else {
+                     beafSeriesShowHide = true;
+                     svg.select(".cls_beef_veal_series").style("display", "block");
+                     svg.selectAll(".cls_beef_veel_points").style("display", "block");
+
+                     svg.selectAll(".crossLine_beef_leaf").style("display", "none");
+                 }
+             });
+
+             // cross lines
+             svg.append("line").attr("x1", (startPositionXForCenterLegend + 0)).attr("x2", (startPositionXForCenterLegend + checkedBoxWidthHeight))
+                 .attr("y1", (-28)).attr("y2", (-8)).style("display", "none")
+             .style("stroke-width", 2).style("stroke", chartConfig.series_beef_veal_color).attr("class","crossLine_beef_leaf");
+             svg.append("line").attr("x2", (startPositionXForCenterLegend + 0)).attr("x1", (startPositionXForCenterLegend + checkedBoxWidthHeight))
+                 .attr("y1", (-28)).attr("y2", (-8)).style("display", "none")
+             .style("stroke-width", 2).style("stroke", chartConfig.series_beef_veal_color).attr("class", "crossLine_beef_leaf");
+
+
+
+             svg.append("text").attr("x", (startPositionXForCenterLegend + 23)).attr("y", (-12))
+                .text(chartConfig.series_beef_veal_label).style("fill", chartConfig.legendLabelColor)
+                .style("font-weight", "bold").style("font-size", chartConfig.legendLabelFontSize)
+                .style("font-family", "arial");
+
+             svg.append("rect").attr("x", (startPositionXForCenterLegend + +94))
+                 .attr("y", (-18)).attr("width", "30").attr("height", "4").style("fill", chartConfig.series_beef_veal_color);
+
+             svg.append("rect").attr("x", (startPositionXForCenterLegend + +124))
+                  .attr("y", (-21)).attr("width", "10").attr("height", "10").attr("rx", 6)
+                .attr("ry", 6).style("fill", chartConfig.series_beef_veal_color);
+
+           
+             // series_lamb_mutton_label
+
+             // series lamb mutton
+             svg.append("rect").attr("x", (startPositionXForCenterLegend + 160)).attr("y", (-28))
+                .attr("width", checkedBoxWidthHeight)
+                .attr("height", checkedBoxWidthHeight)
+                .style("stroke", chartConfig.series_lamb_mutton_color)
+                .style("stroke-width", "2px")
+            .style("fill", "transparent")
+            .on("click", function (d) {
+                if (lambSeriesShowHide) {
+                    // hide it
+                    lambSeriesShowHide = false;
+
+                    svg.select(".cls_lamb_mutton_series").style("display", "none");
+                    svg.selectAll(".cls_lamb_mutton_points").style("display", "none");
+                    svg.selectAll(".crossLine_lamb_mutton").style("display", "block");
+                }
+                else {
+                    lambSeriesShowHide = true;
+                    svg.select(".cls_lamb_mutton_series").style("display", "block");
+                    svg.selectAll(".cls_lamb_mutton_points").style("display", "block");
+                    svg.selectAll(".crossLine_lamb_mutton").style("display", "none");
+                }
+            });
+
+             // cross lines
+             svg.append("line").attr("x1", (startPositionXForCenterLegend + 160)).attr("x2", (startPositionXForCenterLegend + checkedBoxWidthHeight + 160))
+                 .attr("y1", (-28)).attr("y2", (-8)).style("opacity", "1").style("display", "none")
+             .style("stroke-width", 2).style("stroke", chartConfig.series_lamb_mutton_color).attr("class", "crossLine_lamb_mutton");
+
+             svg.append("line").attr("x2", (startPositionXForCenterLegend + 160)).attr("x1", (startPositionXForCenterLegend + checkedBoxWidthHeight + 160))
+                 .attr("y1", (-28)).attr("y2", (-8)).style("opacity", "1").style("display", "none")
+             .style("stroke-width", 2).style("stroke", chartConfig.series_lamb_mutton_color).attr("class", "crossLine_lamb_mutton");
+
+             svg.append("text").attr("x", (startPositionXForCenterLegend + 183)).attr("y", (-12))
+                 .text(chartConfig.series_lamb_mutton_label)
+                 .style("font-weight", "bold").style("font-size", chartConfig.legendLabelFontSize).style("fill", chartConfig.legendLabelColor)
+                 .style("font-family", "arial");
+
+             svg.append("rect").attr("x", (startPositionXForCenterLegend + 275)).attr("y", (-18)).attr("width", "30").attr("height", "4").style("fill", chartConfig.series_lamb_mutton_color);
+             svg.append("rect").attr("x", (startPositionXForCenterLegend + +305))
+                 .attr("y", (-21)).attr("width", "10").attr("height", "10").attr("rx", 6)
+               .attr("ry", 6).style("fill", chartConfig.series_lamb_mutton_color);
+
+
+             // series pig label
+             svg.append("rect").attr("x", (startPositionXForCenterLegend + 345)).attr("y", (-28))
+                .attr("width", checkedBoxWidthHeight)
+                .attr("height", checkedBoxWidthHeight)
+                .style("stroke", chartConfig.series_pig_color)
+                .style("stroke-width", "2px")
+            .style("fill", "transparent")
+            .on("click", function (d) {
+                if (pigfSeriesShowHide) {
+                    // hide it
+                    pigfSeriesShowHide = false;
+
+                    svg.select(".cls_pig_series").style("display", "none");
+                    svg.selectAll(".cls_pig_points").style("display", "none");
+                    svg.selectAll(".crossLine_pig").style("display", "block");
+                }
+                else {
+                    pigfSeriesShowHide = true;
+                    svg.select(".cls_pig_series").style("display", "block");
+                    svg.selectAll(".cls_pig_points").style("display", "block");
+                    svg.selectAll(".crossLine_pig").style("display", "none");
+                }
+            });
+             
+             // cross lines
+             svg.append("line").attr("x1", (startPositionXForCenterLegend + 345)).attr("x2", (startPositionXForCenterLegend + checkedBoxWidthHeight + 345))
+                 .attr("y1", (-28)).attr("y2", (-8)).style("opacity", "1").style("display", "none")
+             .style("stroke-width", 2).style("stroke", chartConfig.series_pig_color).attr("class", "crossLine_pig");
+
+             svg.append("line").attr("x2", (startPositionXForCenterLegend + 345)).attr("x1", (startPositionXForCenterLegend + checkedBoxWidthHeight + 345))
+                 .attr("y1", (-28)).attr("y2", (-8)).style("opacity", "1").style("display", "none")
+             .style("stroke-width", 2).style("stroke", chartConfig.series_pig_color).attr("class", "crossLine_pig");
+
+             // series_pig_label
+             svg.append("text").attr("x", (startPositionXForCenterLegend + 368)).attr("y", (-12))
+                 .text(chartConfig.series_pig_label).style("fill", chartConfig.legendLabelColor)  //chartConfig.legendLabelFontSize
+                 .style("font-weight", "bold").style("font-size", chartConfig.legendLabelFontSize)
+                 .style("font-family", "arial");
+
+             svg.append("rect").attr("x", (startPositionXForCenterLegend + 395)).attr("y", (-18)).attr("width", "30").attr("height", "4").style("fill", chartConfig.series_pig_color);
+             svg.append("rect").attr("x", (startPositionXForCenterLegend + 425))
+                 .attr("y", (-21)).attr("width", "10").attr("height", "10").attr("rx", 16)
+               .attr("ry", 6).style("fill", chartConfig.series_pig_color);
+
+
+
+                          
+             // series_pig_label
+
+             svg.append("rect").attr("x", (startPositionXForCenterLegend + 460)).attr("y", (-28))
+                .attr("width", checkedBoxWidthHeight)
+                .attr("height", checkedBoxWidthHeight)
+                .style("stroke", chartConfig.series_chicken_color)
+                .style("stroke-width", "2px")
+            .style("fill", "transparent")
+            .on("click", function (d) {
+                if (chickenSeriesShowHide) {
+                    // hide it
+                    chickenSeriesShowHide = false;
+
+                    svg.select(".cls_chicken_series").style("display", "none");
+                    svg.selectAll(".cls_chicken_points").style("display", "none");
+
+                    svg.selectAll(".crossLine_chicken").style("display", "block");
+                }
+                else {
+                    chickenSeriesShowHide = true;
+                    svg.select(".cls_chicken_series").style("display", "block");
+                    svg.selectAll(".cls_chicken_points").style("display", "block");
+
+                    svg.selectAll(".crossLine_chicken").style("display", "none");
+                }
+            });
+
+             // cross lines
+             svg.append("line").attr("x1", (startPositionXForCenterLegend + 460)).attr("x2", (startPositionXForCenterLegend + checkedBoxWidthHeight + 460))
+                 .attr("y1", (-28)).attr("y2", (-8)).style("opacity", "1").style("display", "none")
+             .style("stroke-width", 2).style("stroke", chartConfig.series_chicken_color).attr("class", "crossLine_chicken");
+
+             svg.append("line").attr("x2", (startPositionXForCenterLegend + 460)).attr("x1", (startPositionXForCenterLegend + checkedBoxWidthHeight + 460))
+                 .attr("y1", (-28)).attr("y2", (-8)).style("opacity", "1").style("display", "none")
+             .style("stroke-width", 2).style("stroke", chartConfig.series_chicken_color).attr("class", "crossLine_chicken");
+
+             svg.append("text").attr("x", (startPositionXForCenterLegend + 483)).attr("y", (-12))
+                 .text(chartConfig.series_chicken_label).style("fill", chartConfig.legendLabelColor)
+                 .style("font-weight", "bold").style("font-size", chartConfig.legendLabelFontSize)
+                 .style("font-family", "arial");
+
+             svg.append("rect").attr("x", (startPositionXForCenterLegend + 540)).attr("y", (-18)).attr("width", "30").attr("height", "4").style("fill", chartConfig.series_chicken_color);
+             svg.append("rect").attr("x", (startPositionXForCenterLegend + 570))
+                 .attr("y", (-21)).attr("width", "10").attr("height", "10").attr("rx", 16)
+               .attr("ry", 6).style("fill", chartConfig.series_chicken_color);
+         }
+         
+         function c_addClass(target, c_str) {
+             var current = target.attr('class');
+             if (current.indexOf(c_str) < 0) {
+                 current += " " + c_str;
+             }
+             target.attr('class', current);
+         }
+
+         function c_removeClass(target, c_str) {
+             var current = target.attr('class');
+             if (current.indexOf(c_str) >= 0) {
+                 current = str_trim(current.replace(c_str, ""));
+             }
+             target.attr('class', current);
+         }
+
+         function str_trim(x) {
+             return x.replace(/^\s+|\s+$/gm, '');
+         }
+
+</script>
+
+</head>
+
+<body>
+    <p style="font-size:23px; font-weight:bold;text-align:center;color:#BF8B52">
+        Multi Series Line Chart
+    </p>
+    
+    <div style="clear:both;"></div>
+    <div id="chartDiv">
+
+    </div>    
+</body>
+</html>
+
+<script>
+   
+    // Use a timer so the chart is not constantly redrawn while window is being resized.
+    var resizeTimer;
+
+    drawChartForData(chartData, "chartDiv", chartConfig);
+
+</script>
